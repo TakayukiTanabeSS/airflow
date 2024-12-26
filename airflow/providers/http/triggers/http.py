@@ -69,6 +69,10 @@ class HttpTrigger(BaseTrigger):
         self.headers = headers
         self.data = data
         self.extra_options = extra_options
+        self.log.info(
+            "HttpTrigger initialized with http_conn_id=%s, auth_type=%s, method=%s, endpoint=%s, data=%s, extra_options=%s",
+            http_conn_id, auth_type, method, endpoint, data, extra_options
+        )
 
     def serialize(self) -> tuple[str, dict[str, Any]]:
         """Serialize HttpTrigger arguments and classpath."""
@@ -87,27 +91,71 @@ class HttpTrigger(BaseTrigger):
 
     async def run(self) -> AsyncIterator[TriggerEvent]:
         """Make a series of asynchronous http calls via a http hook."""
+        import aiohttp
+        self.log.info("running HttpTrigger")
         hook = HttpAsyncHook(
             method=self.method,
             http_conn_id=self.http_conn_id,
             auth_type=self.auth_type,
         )
+
         try:
+            self.log.info("Running HTTP request")
+            self.log.info("endpoint=%s, data=%s, headers=%s, extra_options=%s", self.endpoint, self.data, self.headers, self.extra_options)
             client_response = await hook.run(
                 endpoint=self.endpoint,
                 data=self.data,
                 headers=self.headers,
                 extra_options=self.extra_options,
             )
-            response = await self._convert_response(client_response)
+            self.log.info("HTTP request completed")
+            self.log.info("Converting aiohttp.client_reqrep.ClientResponse to requests.Response")
+            response = requests.Response()
+            self.log.info("Converting content")
+            max_retries = 100
+            timeout = aiohttp.ClientTimeout(total=3)
+            try:
+                for i in range(max_retries):
+                    try:
+                        self.log.info("Attempt %s to convert content", i)
+                        async with aiohttp.ClientSession(timeout=timeout) as session:
+                            response._content = await client_response.read()
+                        break
+                    except Exception as e:
+                        self.log.error("Failed to convert content: %s", e)
+                        if i == max_retries - 1:
+                            raise
+            except Exception as e:
+                self.log.error("Failed to convert content: %s", e)
+            self.log.info("Converting status code")
+            response.status_code = client_response.status
+            self.log.info("Converting headers")
+            response.headers = CaseInsensitiveDict(client_response.headers)
+            response.url = str(client_response.url)
+            response.history = [await HttpTrigger._convert_response(h) for h in client_response.history]
+            self.log.info("Converting encoding")
+            response.encoding = client_response.get_encoding()
+            response.reason = str(client_response.reason)
+            cookies = RequestsCookieJar()
+            for k, v in client_response.cookies.items():
+                cookies.set(k, v)
+            response.cookies = cookies
+            self.log.info("Response converted successfully")
             yield TriggerEvent(
                 {
                     "status": "success",
                     "response": base64.standard_b64encode(pickle.dumps(response)).decode("ascii"),
                 }
             )
+        except aiohttp.ClientResponseError as e:
+            self.log.error("HTTP request failed with response: %s", e)
+            yield TriggerEvent({"status": "error", "message": f"ClientResponseError: {e}"})
+        except aiohttp.ClientConnectionError as e:
+            self.log.error("HTTP request failed with response: %s", e)
+            yield TriggerEvent({"status": "error", "message": f"ClientConnectionError: {e}"})
         except Exception as e:
             yield TriggerEvent({"status": "error", "message": str(e)})
+
 
     @staticmethod
     async def _convert_response(client_response: ClientResponse) -> requests.Response:
@@ -176,6 +224,7 @@ class HttpSensorTrigger(BaseTrigger):
 
     async def run(self) -> AsyncIterator[TriggerEvent]:
         """Make a series of asynchronous http calls via an http hook."""
+        self.log.info("running HttpSensorTrigger")
         hook = self._get_async_hook()
         while True:
             try:

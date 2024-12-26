@@ -394,6 +394,7 @@ class HttpAsyncHook(BaseHook):
                 raise AirflowException(f"Unexpected HTTP Method: {self.method}")
 
             for attempt in range(1, 1 + self.retry_limit):
+                self.log.info("url=%s, json=%s, headers=%s, extra_options=%s", url, json, _headers, extra_options)
                 response = await request_func(
                     url,
                     params=data if self.method == "GET" else None,
@@ -404,7 +405,9 @@ class HttpAsyncHook(BaseHook):
                     **extra_options,
                 )
                 try:
+                    self.log.info("Response: %s", response)
                     response.raise_for_status()
+                    self.log.info("Response status: %s", response.status)
                 except ClientResponseError as e:
                     self.log.warning(
                         "[Try %d of %d] Request to %s failed.",
@@ -420,6 +423,7 @@ class HttpAsyncHook(BaseHook):
                     else:
                         await asyncio.sleep(self.retry_delay)
                 else:
+                    self.log.info("Request to %s succeeded.", url)
                     return response
             else:
                 raise NotImplementedError  # should not reach this, but makes mypy happy

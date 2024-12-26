@@ -165,6 +165,7 @@ class HttpOperator(BaseOperator):
 
     def execute(self, context: Context) -> Any:
         if self.deferrable:
+            self.log.info("sansan: execute_async")
             self.execute_async(context=context)
         else:
             return self.execute_sync(context=context)
@@ -199,18 +200,23 @@ class HttpOperator(BaseOperator):
         return all_responses
 
     def execute_async(self, context: Context) -> None:
-        self.defer(
-            trigger=HttpTrigger(
-                http_conn_id=self.http_conn_id,
-                auth_type=self.auth_type,
-                method=self.method,
-                endpoint=self.endpoint,
-                headers=self.headers,
-                data=self.data,
-                extra_options=self.extra_options,
-            ),
-            method_name="execute_complete",
-        )
+        try:
+            self.log.info("sansan: defer")
+            self.defer(
+                trigger=HttpTrigger(
+                    http_conn_id=self.http_conn_id,
+                    auth_type=self.auth_type,
+                    method=self.method,
+                    endpoint=self.endpoint,
+                    headers=self.headers,
+                    data=self.data,
+                    extra_options=self.extra_options,
+                ),
+                method_name="execute_complete",
+            )
+        except Exception as e:
+            self.log.info(f"Error: during HTTP request: {e}")
+            raise
 
     def process_response(self, context: Context, response: Response | list[Response]) -> Any:
         """Process the response."""
@@ -258,6 +264,7 @@ class HttpOperator(BaseOperator):
             self.paginate_async(context=context, response=response, previous_responses=paginated_responses)
             return self.process_response(context=context, response=response)
         else:
+            self.log.info(event["status"])
             raise AirflowException(f"Unexpected error in the operation: {event['message']}")
 
     def paginate_async(

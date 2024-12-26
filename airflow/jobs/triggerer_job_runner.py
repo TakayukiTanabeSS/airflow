@@ -627,6 +627,7 @@ class TriggerRunner(threading.Thread, LoggingMixin):
         self.log.info("trigger %s starting", name)
         try:
             self.set_individual_trigger_logging(trigger)
+            self.log.info("trigger.run() will start")
             async for event in trigger.run():
                 self.log.info("Trigger %s fired: %s", self.triggers[trigger_id]["name"], event)
                 self.triggers[trigger_id]["events"] += 1

@@ -202,7 +202,8 @@ def check_docker_version(quiet: bool = False):
             dry_run_override=False,
         )
         if docker_version_result.returncode == 0:
-            docker_version = docker_version_result.stdout.strip()
+            #docker_version = docker_version_result.stdout.strip()
+            docker_version = re.sub(r"^(\d+(?:\.\d+){,2}).*$", r"\1", docker_version_result.stdout.strip())
         if docker_version == "":
             get_console().print(
                 f"""
