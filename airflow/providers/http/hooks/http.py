@@ -406,8 +406,15 @@ class HttpAsyncHook(BaseHook):
                 )
                 try:
                     self.log.info("Response: %s", response)
+                    self.log.info("response.read: %s", await response.read())
+                    self.log.info("Response.closed: %s", response.closed)
+                    self.log.info("response.read: %s", await response.read())
                     response.raise_for_status()
+                    self.log.info("response.read: %s", await response.read())
+                    self.log.info("Response.closed: %s", response.closed)
+                    self.log.info("response.read: %s", await response.read())
                     self.log.info("Response status: %s", response.status)
+                    self.log.info("response.read: %s", await response.read())
                 except ClientResponseError as e:
                     self.log.warning(
                         "[Try %d of %d] Request to %s failed.",
@@ -423,7 +430,9 @@ class HttpAsyncHook(BaseHook):
                     else:
                         await asyncio.sleep(self.retry_delay)
                 else:
+                    self.log.info("response.read: %s", await response.read())
                     self.log.info("Request to %s succeeded.", url)
+                    self.log.info("response.read: %s", await response.read())
                     return response
             else:
                 raise NotImplementedError  # should not reach this, but makes mypy happy

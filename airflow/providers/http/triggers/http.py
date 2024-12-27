@@ -108,9 +108,11 @@ class HttpTrigger(BaseTrigger):
                 headers=self.headers,
                 extra_options=self.extra_options,
             )
+            self.log.info("client_response.read()=%s", await client_response.read())
             self.log.info("HTTP request completed")
             self.log.info("Converting aiohttp.client_reqrep.ClientResponse to requests.Response")
             response = requests.Response()
+            self.log.info("client_response.read()=%s", await client_response.read())
             self.log.info("Converting content")
             max_retries = 100
             timeout = aiohttp.ClientTimeout(total=3)
@@ -120,6 +122,8 @@ class HttpTrigger(BaseTrigger):
                         self.log.info("Attempt %s to convert content", i)
                         async with aiohttp.ClientSession(timeout=timeout) as session:
                             response._content = await client_response.read()
+                            # await client_response.read()
+                            # 代入演算子無しでもダメなので、.read() がダメ
                         break
                     except Exception as e:
                         self.log.error("Failed to convert content: %s", e)
