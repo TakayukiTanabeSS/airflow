@@ -113,7 +113,6 @@ class HttpTrigger(BaseTrigger):
     async def _convert_response(client_response: ClientResponse) -> requests.Response:
         """Convert aiohttp.client_reqrep.ClientResponse to requests.Response."""
         response = requests.Response()
-        response._content = await client_response.read()
         response.status_code = client_response.status
         response.headers = CaseInsensitiveDict(client_response.headers)
         response.url = str(client_response.url)
